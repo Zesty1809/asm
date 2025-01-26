@@ -11,6 +11,9 @@
   - [Data Accessing Methods](#data-accessing-methods)
 - [Chapter 3. Your First Programs](#chapter-3-your-first-programs)
   - [Entering in the Program](#entering-in-the-program)
+  - [Outline of An Assembly Language Program](#outline-of-an-assembly-language-program)
+  - [Planning the Program](#planning-the-program)
+  - [Finding a Maximum Value](#finding-a-maximum-value)
 
 ## Chapter 1. Introduction
 
@@ -106,15 +109,47 @@ Finally, there is the *base pointer addressing mode*. This is similar to indirec
 Okay, this first program is simple. In fact, it's not going to do anything but exit! It's short, but it shows some basics about assembly language and Linux programming. You need to enter the program in an editor exactly as written, with the filename *exit.s*. The program follows. Don't worry about not understanding it. This section only deals with typingg it in and running it. In the Section called *Outline of an Assembly Language Program* we will describe how it works.
 
 ```nasm
+# PURPOSE: Simple program that exits and returns a
+#          status code back to the linux kernel
+#
+
+# INPUT: none
+#
+
+# OUTPUT: returns a status code. This can be viewed
+#         by typing
+#
+#         echo $?
+#
+#         after running the program
+#
+
+# VARIABLES: 
+#         %eax holds the system call number
+#         %ebx holds the return status
+#
+
 .section .data
-    # (Data section can be left empty if not used)
 
 .section .text
 .globl _start
 _start:
-    mov $1, %eax        # System call number for exit (sys_exit)
-    mov $0, %ebx        # Exit status (0)
-    int $0x80           # Trigger system call
+  /* This is a linux kernel command
+  number (system call) for exiting
+  a program */ 
+  movl $1, %eax   
+
+  /* This is the status number we will
+  return to the operating system.
+  Change this around and it will
+  return different things to
+  echo $? */
+  movl $0, %ebx
+
+  /* this wakes up the kernel to run
+  the exit command */
+  int $0x80
+
 ```
 
 Whay you typed in is called the *source code*. Source code is the human-readable form of program. In order to transform it inot a program that a computer can run, we need to *assemble* and *link* it.
@@ -143,4 +178,162 @@ The *./* is used to tell the computer that the program isn't in one of the norma
 echo $?
 ```
 
-It will say *0*. What is happening is that every program when it exits gives Linux an exit status code, which tells it if everything went all right. If everything was okay, it returns 0. UNIX programs return numbers other than zero to indicate failure or other errors, warnings, or statuses. The programmer determines what each number means. You can view this code by typing in *echo $?*. 
+It will say *0*. What is happening is that every program when it exits gives Linux an exit status code, which tells it if everything went all right. If everything was okay, it returns 0. UNIX programs return numbers other than zero to indicate failure or other errors, warnings, or statuses. The programmer determines what each number means. You can view this code by typing in *echo $?*.
+
+### Outline of An Assembly Language Program
+
+Take a look at the program we just entered. At the beginning there are lots of lines that begin with hashes (#). These are *comments*. Comments are not translated by the assembler. They are used only for the programmer to talk to anyone who looks at the code in the future. Most programs you write will be modified by other. Get into habit of writing comments in your code that will help them understand both why the program exists and how it works. Always include the following in your comments:
+
+- The purpose of the code
+- An overview of the processing involved
+- Anything strange your program does and why it does it
+
+After the comments, the next line says
+
+```nasm
+.section .data
+```
+
+Anything starting with a period isn't directly translated into a machine instruction. Instead, it's an instruction to the assembler itself. These are called *assembler directives* or *pseudo-operations* because they are handled by the assembler and are not actually run by the computer. The *.section* command breaks your program into sections. This command starts the data section, where you list any memeory storage you will need for data. Our program doesn't use any, so we don't need the section. It's just here for completeness. Almost every program you write in the future will have data.
+
+Right after this you have
+
+```nasm
+.section .text
+```
+
+which starts the text section. The text section of a program is where the program instructions live.
+
+The next instruction is
+
+```nasm
+.globl _start
+```
+
+This instructs the assembler that _start is important to remember. *_start* is a *symbol*, which means that it is going to be replaced by something else either during assembly or linking. Symbols are generally used to mark locations of programs or data, so you can fefer to them by name insted of by their location number. Imagine if you had to refer to every memeory location by it's address. First of all, it would be very confusing because you would have to memorize or look up the numeric memory address of every piece of code or data. In addition, every time you had to insert a piece of data or code you would have to change all the addresses in your program! Symbols are used so that the assembler and linker can take care of keeping track of addresses, and you can concentrate on writing your program. *.globl* means that the assembler shouldn't discard this symbol after assembly, because the linker will need it. *_start* is special symbol that always needs to be marked with *.globl* because it marks the location of the start of the program. *Without marking this location in this way, when the computer loads your program it won't know where to begin running your program.*
+
+The next line 
+
+```nasm
+_start:
+```
+
+*defines* the value of the *_start* label. A *label* is a symbol followed by a colon. Labels define a symbol's value. When the assembler is assembling the program, it has to assign each data value and instruction an address. Labels tell the assembler to make the symbol's value be wherever the next instruction or data element will be. This way, if the actual physical location of data or instruction changes, you don't have to rewrite any refrences to it - the symbol automatically gets the new value.
+
+Now we get into actual computer instructions. The first such instruction is this:
+
+```nasm
+movl $1, %eax
+```
+
+When the program runs, this instruction transfers the number 1 into the %eax register. In assembly language, many instructions have *operands*. *movl* has two operands - the *source* and the *destination*. In this case, the source is the literal number 1, and the destination is the *%eax* register. Operands can be numbers, memory location references, or registers. Differentj instructions allow different types of operands. Different instructions allow different types of operands.
+
+On most instructions which have two operands, the first one is the source operand and the second one is the destination. Note that in these cases, the source operand is not modified at all. Other instructions of this type are, for example, *addl*, *subl*, and *imull*. These add/subtract/multiply the source operand from/to/by the destination operand and save the result in the destination operand. Other instructions may have an operand hardcoded in. *idivl*, for example, requires that the dividend be in *%eax*, and *%edx* be zero, and the quotient is then transferred to *%eax* and the remainder to *%edx*. However, the divisor can be any register or memory location.
+
+On x86 processors, there are several general-purpose registers (all of which can be used with movl):
+
+- %eax
+- %ebx
+- %ecx
+- %edx
+- %edi
+- %esi
+
+In addition to those general-purpose registers, there are also several special-purpose registers, including:
+
+- %ebp
+- %esp
+- %eip
+- %eflags
+
+We'll discuss these later, just be aware that they exist. Some of these registers, like %eip and %eflags can only be accessed through special instructions. The others can be accessed using the same instruction as general-purpose registers, but they have special meanings, special uses, or are simply faster when used in a specific way.
+
+So, the *movl* instruction moves the number 1 into %eax. The dollar-sign in front of the one indicates that we want to use immediate mode addressing (refer back to the Section called Data Accessing Methods in Chapter 2). Without the dollar-sign it would do direct addressing, loading whatever number is at address 1. We want the actual number *1* loaded in, so we have to use immediate mode.
+
+The reason we are moving the number 1 into *%eax* is because we are preparing to call the Linux Kernel. The number 1 is the number of the *exit system call*. We will discuss system calls in more depth soon, but basically they are requests for the operating system's help. Normal programs can't do everything. Many operations such as calling other programs, dealing with files, and exiting have to be handled by the operating system through system calls. when you make a *system call*, which we will do shortly, the system call number has to be loaded into %eax. Depending on the system call, other registers may have to have values in them as well. Note that system calls is not the only use or even the main use of registers. It is just the one we are dealing with in this first program. Later programs will use registers for regular computation.
+
+The operating system, however, usually needs more information than just which call to make. For example, when dealing with files, the operating system needs to know which file you are dealing with, what data you want to write, and other details. The extra details, called *parameters* are stored in other registers. In the case of the *exit* system call, the operating system requires a status code be loaded in *%ebx*. This value is then returned to the system. This is the value you retrieved when you typed *echo $?*. So, we load *%ebx* with *0* by typing the following:
+
+```nasm
+movl $0, %ebx
+```
+
+Now, loading registers with these numbers doesn't do anything itself. Registers are used for all sorts of things besides system calls. They are where all program logic such as addition, subtraction, and comparisons take place. Linux simply requires that certain registers be loaded with certain parameter values before making a system call. *%eax* is always required to be loaded with the system call number. For the other registers, however, each system call has different requirements. In the *exit* system call, *%ebx* is required to be loaded with the exit status. 
+
+The next instruction is the "magic" one. It looks like this:
+
+```nasm
+int $0x80
+```
+
+The *int* stands for *interrupt*. The *0x80* is the interrupt number to use. An *interrupt* interrupts the normal program flow, and transfers control from our program to Linux so that it will do a system call.
+
+### Planning the Program
+
+In our next program we will try to find the maximum of a list of numbers. Computers are very detail-oriented, so in order to write the program we will have to have planned out a number of details. These details include:
+
+- Where will the original list of numbers be stored?
+- What procedure will we need to follow to find the maximum number?
+- How much storage do we need to carry out that procedure?
+- Will all of the storage fit into registers, or do we need to use some memory as well?
+
+In computers, you have to plan every step of the way. So, let's do a little planning. First of all, just for reference, let's name the address where the list of numbers starts as *data_items*. Let's say that the last number in the list will be a zero, so we know where to stop. We also need a value to hold the current position in the list, a value to hold the current list element being examined, and the current highest value on the list. Let's assign each of these a register:
+
+- %edi will hold the current position in the list.
+- %ebx will hold the current highest value in the list.
+- %eax will hold the current element being examined.
+
+When we begin the program and look at the first item in the list, since we haven't seen any other items, that item will automatically be the current largest element in the list. Also, we will set the current position in the list to be zero - the first element. From then, we will follow the following steps:
+
+1. Check the current list element (%eax) to see if it's zero (the terminating element).
+2. If it is zero, exit.
+3. Increase the current position (%edi).
+4. Load the next value in the list into the current value register (%eax). What addressing mode might we use here? Why?
+5. Compare the current value (%eax) with the current highest value (%ebx).
+6. If the current value is greater than the current highest value, replace the current highest value with the current value.
+7. Repeat
+
+That is the procedure. many times in that procedure I made use of the word "if". These places are where decisions are to be made.
+
+These "if"'s are a class of instructions called *flow control* instructions, because they tell the computer which steps to follow and which paths to take. This program is much more dynamic and is directed by data. Depending on what data it receives, it will follow different instruction paths.
+
+In this program, this will be accomplished by two different instructions, the conditional jump and the unconditional jump. The conditional jump changes path based on the results of a previous comparison or calculation. The unconditional jump just goes directly to a different path no matter what. The unconditional jump may seem useless, but it is very necessary since all of the instructions will be laid out on a line. If a path needs to converge back to the main path, it will have to do this by an unconditional jump. 
+
+Another use of flow control is in implementing loops. A loop is a piece of program code that is meant to be repeated. In our example, the first part of the program (setting the current position to 0 and loading the current highest value with the current value) was only done once, so it wasn't a loop. However, the next part is repeated over and over again for every number in the list. It is only left when we have come to the last element, indicated by zero. This is called a *loop* because it occurs over and over again. It is implemented by doing unconditional jumps to the beginning of the loop at the end of the loop, which causes it to start over. However, you have to always remember to have a conditional jump to exit the loop somewhere, or the loop will continue forever! This condition is called an *infinite loop*. If we accidently left out step 1, 2, or 3, the loop (and our program) would never end.
+
+In the next section, we will implement this program that we planned.
+
+### Finding a Maximum Value
+
+Enter the following program as *maximum.s*:
+
+```nasm
+.section .data
+data_items:
+  .long 3, 67, 35, 222, 47, 76, 85, 44, 33, 22, 11, 99, 0
+
+.section .text
+
+.globl _start
+_start:
+  movl $0, %edi
+  movl data_items(,%edi,4), %eax
+  movl %eax, %ebx
+
+start_loop:
+  cmpl $0, %eax
+  je loop_exit
+  incl %edi
+  movl data_items(,%edi,4), %eax
+  cmpl %ebx, %eax
+  jle start_loop
+
+  movl %eax, %ebx
+
+  jmp start_loop
+
+loop_exit:
+  movl $1, %eax
+  int $0x80
+
+```
